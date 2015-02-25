@@ -77,6 +77,8 @@ class multimedia_link extends EditorHandler
 
 		// 자동재생 옵션, 에디터에서 간편 코드 수정을 위해 true -> 1로 변경
 		$auto_play = $auto_start=="1" ? '1': '0';
+		// 네이버 tvcast 등 true 옵션 사용 용도
+		$auto_play_true = $auto_start=="1" ? 'true': 'false';
 
 		$wmode = $xml_obj->attrs->wmode;
 		if($wmode == 'window') $wmode = 'window';
@@ -88,7 +90,7 @@ class multimedia_link extends EditorHandler
 		$src = str_replace(array('&','"'), array('&amp;','&qout;'), $src);
 		$src = str_replace('&amp;amp;', '&amp;', $src);
 
-		if(preg_match_all('/(?:youtube-nocookie\.com\/embed\/|youtube\.com\/watch\?v\=|youtube\.com\/v\/|youtu\.be\/?|youtube\.com\/embed\/).*?([0-9a-zA-Z-_]{11}?)(.*?list=([0-9a-zA-Z-_]{34}?))?(,pl=(.*))?/i', $src, $matches))
+		if(preg_match_all('/(?:youtube-nocookie\.com\/embed\/|youtube\.com\/watch\?v\=|youtube\.com\/v\/|youtu\.be\/?|youtube\.com\/embed\/).*?([0-9a-zA-Z-_]{11}?)(.*?list=([0-9a-zA-Z-_]{34}?))?(@pl=([^@]*))?(@s=([^@]*))?(@e=([^@]*))?/i', $src, $matches))
 		{	// Youtube list(재생 목록 ID) 형태
 			if(strpos($src, "list=") !== false)
 			{	$yt_list_id = $matches[3][0];
@@ -101,10 +103,27 @@ class multimedia_link extends EditorHandler
 
 			// Youtube playlist(재생 목록 ID가 아닌) 형태
 			// 영상ID, 영상ID...
-			if(strpos($src, "pl=") !== false)
+			if(strpos($src, "@pl=") !== false)
 			{	$yt_playlist_ids = $matches[5][0];}
 			else
 			{	$yt_playlist_ids = null;}
+
+			// Youtube start time(초단위 변환)
+			if(strpos($src, "@s=") !== false)
+			{	preg_match('/^(\d*?):?(\d*?):?(\d*)$/i', $matches[7][0], $yt_start_match);
+				$yt_start_time = ($yt_start_match[1]*3600) + ($yt_start_match[2]*60) + $yt_start_match[3];
+			}
+			else
+			{	$yt_start_time = null;}
+
+			// Youtube end time(초단위 변환)
+			if(strpos($src, "@e=") !== false)
+			{	preg_match('/^(\d*?):?(\d*?):?(\d*)$/i', $matches[9][0], $yt_end_match);
+				$yt_end_time = ($yt_end_match[1]*3600) + ($yt_end_match[2]*60) + $yt_end_match[3];
+			}
+			else
+			{	$yt_end_time = null;}
+
 
 			// Youtube ID
 			$yt_id = $matches[1][0];
@@ -245,12 +264,12 @@ class multimedia_link extends EditorHandler
 					'hl'			=>	'ja',
 					'color'			=>	'white',
 					'theme'			=>	'light',
-					'start'			=>	null,
-					'end'			=>	null,
 					'html5'			=>	0,
 					'list'			=>	$yt_list_id,
 					'listType'		=>	$yt_list_type,
 					'playlist'		=>	$yt_playlist_ids
+					'start'			=>	$yt_start_time,
+					'end'			=>	$yt_end_time
 				);
 
 				$yt_options[$yt_counter]["event"] = array
@@ -288,12 +307,12 @@ class multimedia_link extends EditorHandler
 					'hl'			=>	'en',
 					'color'			=>	'white',
 					'theme'			=>	'light',
-					'start'			=>	null,
-					'end'			=>	null,
 					'html5'			=>	0,
 					'list'			=>	$yt_list_id,
 					'listType'		=>	$yt_list_type,
 					'playlist'		=>	$yt_playlist_ids
+					'start'			=>	$yt_start_time,
+					'end'			=>	$yt_end_time
 				);
 
 				$yt_options[$yt_counter]["event"] = array
@@ -370,8 +389,93 @@ class multimedia_link extends EditorHandler
 		elseif(preg_match('/rmcnmv\.naver\.com.*vid=(.*)/i', $src, $match))
 		{	$naver_tvcast_id = $match[1];
 			// 반응형 적용 불가능, 고정 픽셀 크기 사용
-			// 현재 1080p 자동 재생 방법 찾지 못함
-			return sprintf('<div style="margin: 0 auto 10px; width: 1157px; height: 651px; box-shadow: 0px 1px 7px #48335e;"><iframe src="http://serviceapi.rmcnmv.naver.com/flash/outKeyPlayer.nhn?vid=%s&controlBarMovable=true&jsCallable=true&isAutoPlay=%s&skinName=tvcast_white" frameborder="no" scrolling="no" marginwidth="0" marginheight="0" width="1157" height="651"></iframe></div>', $naver_tvcast_id, $auto_start);
+			// 현재 iframe 1080p 자동 재생 방법 찾지 못함 (iframe 하위 div width, height 계산되는 픽셀 무력화 시켜야 함
+			//return sprintf('<div style="margin: 0 auto 10px; width: 1157px; height: 651px; box-shadow: 0px 1px 7px #48335e;"><iframe src="http://serviceapi.rmcnmv.naver.com/flash/outKeyPlayer.nhn?vid=%s&controlBarMovable=true&jsCallable=true&isAutoPlay=%s&skinName=tvcast_white" frameborder="no" scrolling="no" marginwidth="0" marginheight="0" width="1157" height="651" quality="high"></iframe></div>', $naver_tvcast_id, $auto_play_true);
+
+			// 반응형 적용을 위해 직접 embed 코드 삽입
+			/* 넣으면 출력 안됨
+			&amp;api=http%3A//serviceapi.rmcnmv.naver.com/flash
+			&amp;skinURL=http%3A//serviceapi.rmcnmv.naver.com/flash/getCommonPlayerSkin.nhn%3Fname%3Dtvcast_white
+			&amp;skinName=tvcast_white // api url을 넣을 수 없으니 삽입해도 적용 불가능
+			&amp;contentInfo=%5Bobject%20Object%5D
+			&amp;socialInfoData=%5Bobject%20Object%5D
+			&amp;customPlayButton=http%3A//serviceapi.rmcnmv.naver.com/resources/img/news_play_btn.png
+			&amp;controls=%7B%22visible%22%3A%7B%22logo%22%3Atrue%7D%7D
+			width="100%" height="100%" 
+			*/
+
+			/* rmcplayer3_launcher_20131018.js
+			wmode : "window",
+			wmode_outkey : "transparent",
+			autoPlay : "",
+			api : "",
+			skinName : "default",
+			coverImageURL : "",
+			isResizableCoverImage : "",
+			beginTime : "",
+			hasRelativeMovie : "",
+			isP2P : "",
+			defaultResolution : "",
+			limitHDResolution : "",
+			defaultVolume : "",
+			callbackHandler : "",
+			ext : "",
+			isPullingDownResolution : "",
+			timeNoticeDisplayed : "",
+			bufferFulledTime : "",
+			limitTimeForDroppedFPS : "",
+			droppedFPSDetected : "",
+			droppedFPSMonitered : "",
+			limitCountForDroppedFPS : "",
+			objId : "",
+			protocol : "",
+			backgroundColor : "#000000",
+			typeTimeFormat : "",
+			playRelationVideo : "",
+			reloadPage : "",
+			cassiodServiceID : "",
+			targetHost : "",
+			serviceHost : "",
+			controlBarMovable : "false",
+			adMeta : "",
+			apiAD : "",
+			apiMusic : "",
+			postkey : "",
+			musicLogRoot : "",
+			musicUrl : "",
+			referrer : "",
+			expand : "",
+			autoLocale : false,
+			locale : "ko",
+			contentInfo : {
+				title : "",
+				category : "",
+				categoryLink : null,
+				recommendCount : 0
+			},
+			showSocialPlugIn : false,
+			socialInfoData : {
+				sourceUrl : "",
+				service : {
+					recommend : "off",
+					bookmark : "off",
+					me2post : "off",
+					line : "off",
+					facebook : "off",
+					twitter : "off",
+					band : "off",
+					kakaotalk : "off",
+					copyurl : "off"
+				},
+				callback : {
+					recommend : null
+				}
+			},
+			advertiseInfo : null,
+			advertiseUrl : null
+			*/
+			// 1080p 수동 전환해야 하기때문에 현재 auto play 의미가 없으니 임시 모두 해제 처리
+			return sprintf('<div class="trailer"><embed src="http://serviceapi.rmcnmv.naver.com/flash/getCommonPlayer.nhn" quality="high"  flashvars="vid=%s&amp;wmode=window&amp;wmode_outkey=transparent&amp;isAutoPlay=%s&amp;callbackHandler=onPlayerStatusChangeFlash&amp;ext=outService&amp;cassiodServiceID=NAVER&amp;controlBarMovable=true&amp;autoLocale=false&amp;locale=ko&amp;showSocialPlugIn=false&amp;jsCallable=true&amp;showVendor=false&amp;showContentInfo=true" allowscriptaccess="always" allowfullscreen="true" type="application/x-shockwave-flash" pluginspage="http://www.macromedia.com/go/getflashplayer"></embed></div>', $naver_tvcast_id, $auto_play_true = "false");
 		}
 
 		// IMDB (현재 iframe 막혔음)
