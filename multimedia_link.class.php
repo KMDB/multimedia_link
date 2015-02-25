@@ -267,7 +267,7 @@ class multimedia_link extends EditorHandler
 					'html5'			=>	0,
 					'list'			=>	$yt_list_id,
 					'listType'		=>	$yt_list_type,
-					'playlist'		=>	$yt_playlist_ids
+					'playlist'		=>	$yt_playlist_ids,
 					'start'			=>	$yt_start_time,
 					'end'			=>	$yt_end_time
 				);
@@ -310,7 +310,7 @@ class multimedia_link extends EditorHandler
 					'html5'			=>	0,
 					'list'			=>	$yt_list_id,
 					'listType'		=>	$yt_list_type,
-					'playlist'		=>	$yt_playlist_ids
+					'playlist'		=>	$yt_playlist_ids,
 					'start'			=>	$yt_start_time,
 					'end'			=>	$yt_end_time
 				);
